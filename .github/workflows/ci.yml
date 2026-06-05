@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - name: Check formatting (oxfmt)
+        run: bun run fmt:check
       - name: Lint JS (oxlint)
         run: bun run lint
       - name: Lint shell (shellcheck)

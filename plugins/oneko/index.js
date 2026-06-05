@@ -17,10 +17,16 @@ module.exports = {
     try {
       script = fs.readFileSync(path.join(VENDOR, 'oneko.js'), 'utf8');
       gifB64 = fs.readFileSync(path.join(VENDOR, 'oneko.gif')).toString('base64');
-    } catch (e) {ctx.log('failed vendor', e.message);return;
-}
-    script = script.replace('if (isReducedMotion) return;', '').replace('nekoEl.style.backgroundImage = `url(${nekoFile})`;', '');
-    ctx.injectCSS(`#oneko{background-image:url("data:image/gif;base64,${gifB64}") !important;` + `image-rendering:pixelated !important}`);
+    } catch (e) {
+      ctx.log('failed vendor', e.message);
+      return;
+    }
+    script = script
+      .replace('if (isReducedMotion) return;', '')
+      .replace('nekoEl.style.backgroundImage = `url(${nekoFile})`;', '');
+    ctx.injectCSS(
+      `#oneko{background-image:url("data:image/gif;base64,${gifB64}") !important;image-rendering:pixelated !important}`,
+    );
     ctx.injectJS(`(function(){if(document.getElementById('oneko'))return;\n${script}\n})();`);
   },
 };

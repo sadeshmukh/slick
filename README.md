@@ -35,7 +35,7 @@ Themes are defined in the `themes/` folder as JSON files exporting the following
   "palette": { "highlight1": { "100": "139,92,246" } }, // --dt_color-plt-<ramp>-<shade>, raw "r,g,b"
   "sidebar": { "nav-bg": "#1A1525" }, // --p-team_sidebar__<key>
   "vars": { "--any-css-var": "value" }, // overrides
-  "css": "selector { prop: val !important; }" // raw css (string or array)
+  "css": "selector { prop: val !important; }", // raw css (string or array)
 }
 ```
 

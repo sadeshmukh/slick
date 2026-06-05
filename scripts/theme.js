@@ -13,7 +13,7 @@ function buildSpec(themePath) {
   return {
     name: t.name || path.basename(themePath, '.json'),
     vars,
-    css: Array.isArray(t.css) ? t.css.join('\n') : (t.css || ''),
+    css: Array.isArray(t.css) ? t.css.join('\n') : t.css || '',
   };
 }
 

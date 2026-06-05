@@ -15,7 +15,9 @@ function readEnabled(pluginsDir) {
   try {
     const arr = readJson(path.join(pluginsDir, 'enabled.json'));
     return Array.isArray(arr) ? arr : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function writeEnabled(pluginsDir, names) {
@@ -24,8 +26,11 @@ function writeEnabled(pluginsDir, names) {
 
 const activeFile = (themesDir) => path.join(themesDir, '.active');
 function readActiveTheme(themesDir) {
-  try { return fs.readFileSync(activeFile(themesDir), 'utf8').trim() || null; }
-  catch { return null; }
+  try {
+    return fs.readFileSync(activeFile(themesDir), 'utf8').trim() || null;
+  } catch {
+    return null;
+  }
 }
 function writeActiveTheme(themesDir, name) {
   fs.writeFileSync(activeFile(themesDir), String(name).trim() + '\n');
@@ -33,12 +38,15 @@ function writeActiveTheme(themesDir, name) {
 
 function listThemes(themesDir, activeName) {
   let files = [];
-  try { files = fs.readdirSync(themesDir).filter((f) => f.endsWith('.json') && !f.startsWith('.')); }
-  catch {}
+  try {
+    files = fs.readdirSync(themesDir).filter((f) => f.endsWith('.json') && !f.startsWith('.'));
+  } catch {}
   return files.map((f) => {
     const file = f.replace(/\.json$/, '');
     let t = {};
-    try { t = readJson(path.join(themesDir, f)); } catch {}
+    try {
+      t = readJson(path.join(themesDir, f));
+    } catch {}
     return { file, label: t.name || file, description: t.description || '', active: file === activeName };
   });
 }
@@ -47,8 +55,11 @@ function buildManifest({ pluginsDir, themesDir, activeTheme }) {
   const enabled = readEnabled(pluginsDir);
   const plugins = pluginDirs(pluginsDir).map((dir) => {
     let meta = {};
-    try { meta = require(path.join(pluginsDir, dir, 'index.js')).meta || {}; }
-    catch (e) { meta = { description: `(failed to load: ${e.message})` }; }
+    try {
+      meta = require(path.join(pluginsDir, dir, 'index.js')).meta || {};
+    } catch (e) {
+      meta = { description: `(failed to load: ${e.message})` };
+    }
     return {
       dir,
       name: meta.name || dir,
@@ -79,7 +90,11 @@ function setPluginEnabled(pluginsDir, dir, on) {
 
 function handleControl(rawUrl, { pluginsDir, themesDir, app, onTheme }) {
   let u;
-  try { u = new URL(rawUrl); } catch { return false; }
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return false;
+  }
   if (u.host !== CONTROL_HOST) return false;
   const op = u.searchParams.get('op');
   if (op === 'toggle') {
@@ -87,18 +102,29 @@ function handleControl(rawUrl, { pluginsDir, themesDir, app, onTheme }) {
     const on = u.searchParams.get('enabled') === '1';
     if (dir) {
       const names = setPluginEnabled(pluginsDir, dir, on);
-      console.log(`[slick-settings] ${dir} -> ${on ? 'enabled' : 'disabled'} (enabled now: ${names.join(', ') || 'none'})`);
+      console.log(
+        `[slick-settings] ${dir} -> ${on ? 'enabled' : 'disabled'} (enabled now: ${names.join(', ') || 'none'})`,
+      );
     }
   } else if (op === 'theme') {
     const name = u.searchParams.get('name');
     if (name && themesDir && listThemes(themesDir).some((t) => t.file === name)) {
       writeActiveTheme(themesDir, name);
       console.log(`[slick-settings] theme -> ${name}`);
-      if (onTheme) { try { onTheme(name); } catch (e) { console.error('[slick-settings] onTheme failed:', e.message); } }
+      if (onTheme) {
+        try {
+          onTheme(name);
+        } catch (e) {
+          console.error('[slick-settings] onTheme failed:', e.message);
+        }
+      }
     }
   } else if (op === 'restart') {
     console.log('[slick-settings] relaunching to apply plugin changes');
-    if (app) { app.relaunch(); app.exit(0); }
+    if (app) {
+      app.relaunch();
+      app.exit(0);
+    }
   }
   return true;
 }

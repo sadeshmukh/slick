@@ -8,13 +8,22 @@ const isSlackUrl = (v) => typeof v === 'string' && /^slack:/i.test(v);
 const isEphemeralArg = (v) => isSlackUrl(v) || v === '--test-type=webdriver' || v === '--userAgent';
 
 function registerSlackProtocol(setter) {
-  return setter(PROTOCOL, process.execPath, [...process.execArgv, ...process.argv.slice(1)].filter((a) => !isEphemeralArg(a)));
+  return setter(
+    PROTOCOL,
+    process.execPath,
+    [...process.execArgv, ...process.argv.slice(1)].filter((a) => !isEphemeralArg(a)),
+  );
 }
 
 const originalSetDefault = app.setAsDefaultProtocolClient.bind(app);
 app.setAsDefaultProtocolClient = function patchedSetAsDefaultProtocolClient(protocol, executablePath, args) {
-  if (protocol === PROTOCOL && process.platform === 'darwin' && process.env.SLICK_HANDOFF_FORCE_TARGET !== '0'
-      && !executablePath && !args) {
+  if (
+    protocol === PROTOCOL &&
+    process.platform === 'darwin' &&
+    process.env.SLICK_HANDOFF_FORCE_TARGET !== '0' &&
+    !executablePath &&
+    !args
+  ) {
     return registerSlackProtocol(originalSetDefault);
   }
   return originalSetDefault(protocol, executablePath, args);

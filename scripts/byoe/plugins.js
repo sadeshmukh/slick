@@ -5,15 +5,22 @@ const path = require('path');
 
 function pluginDirs(dir) {
   try {
-    return fs.readdirSync(dir, { withFileTypes: true })
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
       .filter((d) => d.isDirectory() && fs.existsSync(path.join(dir, d.name, 'index.js')))
       .map((d) => d.name);
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 function discover(dir) {
   const env = (process.env.SLICK_PLUGINS || '').trim();
-  if (env) return env.split(',').map((s) => s.trim()).filter(Boolean);
+  if (env)
+    return env
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   try {
     const list = JSON.parse(fs.readFileSync(path.join(dir, 'enabled.json'), 'utf8'));
     if (Array.isArray(list)) return list;
@@ -28,8 +35,12 @@ function loadPlugins({ pluginsDir, electron }) {
 
   for (const name of discover(pluginsDir)) {
     let mod;
-    try { mod = require(path.join(pluginsDir, name, 'index.js')); }
-    catch (e) { console.error(`[plugins] failed to load "${name}": ${e.message}`); continue; }
+    try {
+      mod = require(path.join(pluginsDir, name, 'index.js'));
+    } catch (e) {
+      console.error(`[plugins] failed to load "${name}": ${e.message}`);
+      continue;
+    }
 
     const ctx = {
       name,
@@ -38,14 +49,22 @@ function loadPlugins({ pluginsDir, electron }) {
       log: (...a) => console.log(`[plugin:${name}]`, ...a),
       blockURLs: (pats) => out.block.push(...[].concat(pats)),
       injectCSS: (css) => out.css.push([].concat(css).join('\n')),
-      injectJS: (js) => { if (js) out.js.push(String(js)); },
-      onWindow: (cb) => { if (typeof cb === 'function') out.windowHooks.push(cb); },
+      injectJS: (js) => {
+        if (js) out.js.push(String(js));
+      },
+      onWindow: (cb) => {
+        if (typeof cb === 'function') out.windowHooks.push(cb);
+      },
     };
 
     if (mod.css) ctx.injectCSS(mod.css);
     if (mod.renderer) ctx.injectJS(mod.renderer);
     if (typeof mod.main === 'function') {
-      try { mod.main(ctx); } catch (e) { ctx.log('main() threw:', e.message); }
+      try {
+        mod.main(ctx);
+      } catch (e) {
+        ctx.log('main() threw:', e.message);
+      }
     }
     out.loaded.push((mod.meta && mod.meta.name) || name);
   }

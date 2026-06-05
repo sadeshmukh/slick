@@ -86,10 +86,17 @@ function main() {
     CFBundleExecutable: 'Electron',
     CFBundleShortVersionString: '0.0.1',
     CFBundleVersion: '0.0.1',
-  })) plutil('-replace', k, '-string', v, plist);
-  for (const k of ['ElectronAsarIntegrity', 'CFBundleURLTypes']) spawnSync('/usr/bin/plutil', ['-remove', k, plist], { encoding: 'utf8' });
-  plutil('-insert', 'CFBundleURLTypes', '-json',
-    JSON.stringify([{ CFBundleURLName: 'Slack URL', CFBundleURLSchemes: ['slack'] }]), plist);
+  }))
+    plutil('-replace', k, '-string', v, plist);
+  for (const k of ['ElectronAsarIntegrity', 'CFBundleURLTypes'])
+    spawnSync('/usr/bin/plutil', ['-remove', k, plist], { encoding: 'utf8' });
+  plutil(
+    '-insert',
+    'CFBundleURLTypes',
+    '-json',
+    JSON.stringify([{ CFBundleURLName: 'Slack URL', CFBundleURLSchemes: ['slack'] }]),
+    plist,
+  );
 
   const files = [
     {
@@ -128,11 +135,17 @@ require(SLACK_ASAR);
 
   run('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', target]);
 
-  console.log(JSON.stringify({
-    app: target,
-    profile,
-    note: 'Open this to register slack:// to Slick',
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        app: target,
+        profile,
+        note: 'Open this to register slack:// to Slick',
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 try {
