@@ -1,0 +1,9 @@
+{
+  "name": "byoe",
+  "description": "BYOE = bring your own electron!",
+  "private": true,
+  "dependencies": {
+    "electron": "42.2.0"
+  },
+  "trustedDependencies": ["electron"]
+}

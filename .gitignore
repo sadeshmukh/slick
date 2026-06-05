@@ -1,0 +1,5 @@
+.DS_Store
+*.log
+work/
+node_modules/
+byoe/node_modules/

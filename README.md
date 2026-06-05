@@ -1,0 +1,70 @@
+<h1 align="center">
+  <img src="./assets/icon.png" alt="Logo" width="100" />
+  <br />Slick
+</h1>
+<h3 align="center">The coolest Slack client mod for MacOS</h3>
+
+> [!CAUTION]
+> This is in early alpha and may not be even allowed by Salesforce. Expect breakage, bugs, and random crashes. Consider using a alt account for testing. Information here may be inaccurate or incomplete, but the code is open source and you can inspect it yourself. No help will be provided for running or modifying it.
+
+![screenshot](https://cdn.hackclub.com/019e981c-32d4-7312-9e7c-b6836219afb1/image.jpg)
+
+Slick runs Slack's own `app.asar` with a custom Electron (with the handy BYOE acronym, bring your own electron) preload that injects themes and plugins. This method allows us to modify Slack's interface and behavior without altering its files, so auto-updates still work and there's no open debug port or resident watcher.
+
+This client is for MacOS only, but in theory the same method could work on Windows or Linux with some adjustments. However, I don't use those platforms, so PRs welcome if you want to add support for them!
+
+## Setup
+
+You can get up and running with a single script:
+
+```bash
+./install.sh
+```
+
+First launch shows a sign-in screen (a different code signature can't decrypt Slack's existing session); sign in once and you should be set! You can customize themes and plugins from the new Slick tab in Preferences.
+
+If you want to debug or poke around at things, you can find more manual scripts in the scripts/ folder, but the install script should be all you need for normal use.
+
+## Themes
+
+Themes are defined in the `themes/` folder as JSON files exporting the following:
+
+```jsonc
+{
+  "name": "Super cool epic theme",
+  "palette": { "highlight1": { "100": "139,92,246" } }, // --dt_color-plt-<ramp>-<shade>, raw "r,g,b"
+  "sidebar": { "nav-bg": "#1A1525" }, // --p-team_sidebar__<key>
+  "vars": { "--any-css-var": "value" }, // overrides
+  "css": "selector { prop: val !important; }" // raw css (string or array)
+}
+```
+
+`themes/amoled.json` (true black) and `themes/ultraviolet.json` (violet) are
+working examples. More documentation pending.
+
+## Plugins
+
+Plugins are defined in the `plugins/` folder as subfolders with an `index.js` file that export the following:
+
+```js
+module.exports = {
+  meta: { name, description, version },
+  main(ctx) {}, // optional, main process
+  css, // optional, CSS for every window
+  renderer, // optional, JS run in every page
+};
+```
+
+`ctx` provides `blockURLs`, `injectCSS`, `injectJS`, `onWindow`, `log`, and raw Electron access. `plugins/enabled.json` lists which load by default. More documentation about these pending.
+
+## Credits
+
+- [Slack](https://slack.com/) for the original app and its delightful internals.
+- [Electron](https://www.electronjs.org/) for the runtime and APIs.
+- [@ImShyMike](https://github.com/ImShyMike) for advice on breaking into Slack.
+- [Vencord](https://github.com/vencord) for plugin inspiration.
+- Claude for cleaning up the code and generally being a good assistant.
+
+## Legal
+
+This is under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for the legal mumbo jumbo. In short: just don't be a dick. If you're not sure what that means, see [choosealicense.com/licenses/gpl-3.0](https://choosealicense.com/licenses/gpl-3.0/). This code is provided to you for free, use at your own risk. I am not responsible for any harms due to the code here. Don't sue me.
