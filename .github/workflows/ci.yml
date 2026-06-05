@@ -6,17 +6,15 @@ on:
   pull_request:
 
 jobs:
-  ci:
+  check:
+    name: ${{ matrix.check }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ['fmt:check', lint, 'lint:sh', validate]
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - name: Check formatting (oxfmt)
-        run: bun run fmt:check
-      - name: Lint JS (oxlint)
-        run: bun run lint
-      - name: Lint shell (shellcheck)
-        run: bun run lint:sh
-      - name: Validate themes & plugins
-        run: bun run validate
+      - run: bun run ${{ matrix.check }}
