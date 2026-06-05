@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Lint JS (oxlint)
+        run: bun run lint
+      - name: Lint shell (shellcheck)
+        run: bun run lint:sh
+      - name: Validate themes & plugins
+        run: bun run validate
