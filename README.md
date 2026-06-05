@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="./assets/icon.png" alt="Logo" width="100" />
+  <img src="./assets/icon.png" alt="Logo" width="300" />
   <br />Slick
 </h1>
 <h3 align="center">The coolest Slack client mod for MacOS</h3>
