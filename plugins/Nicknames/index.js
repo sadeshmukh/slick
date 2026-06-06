@@ -5,7 +5,7 @@ const path = require('path');
 module.exports = {
   meta: {
     name: 'Nicknames',
-    description: 'Set local nicknames for users.',
+    description: 'Set local nicknames for users',
     version: '1.0.0',
   },
 
