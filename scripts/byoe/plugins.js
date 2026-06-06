@@ -66,9 +66,10 @@ function discover(dir, enabled) {
 }
 
 function loadPlugins({ pluginsDir, enabled, electron, settings }) {
-  const out = { block: [], css: [], cssFns: [], js: [], windowHooks: [], loaded: [] };
+  const out = { block: [], css: [], cssFns: [], js: [], windowHooks: [], loaded: [], timings: [] };
 
   for (const name of discover(pluginsDir, enabled)) {
+    const start = performance.now();
     let mod;
     try {
       mod = require(path.join(pluginsDir, name, 'index.js'));
@@ -105,6 +106,7 @@ function loadPlugins({ pluginsDir, enabled, electron, settings }) {
       }
     }
     out.loaded.push((mod.meta && mod.meta.name) || name);
+    out.timings.push({ name, ms: performance.now() - start });
   }
 
   return out;

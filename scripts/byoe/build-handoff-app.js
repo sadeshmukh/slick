@@ -65,6 +65,7 @@ function copyRuntime(resources) {
   for (const file of [
     'scripts/byoe/inject.js',
     'scripts/byoe/login-handoff.js',
+    'scripts/byoe/perf.js',
     'scripts/byoe/plugins.js',
     'scripts/byoe/settings-renderer.js',
     'scripts/byoe/settings-ui.js',
