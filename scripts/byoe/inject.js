@@ -377,7 +377,8 @@ watchRuntimeFile(ENABLED_FILE, readEnabled, setEnabled);
 watchRuntimeFile(ACTIVE_THEME_FILE, () => settings.readActiveTheme(ACTIVE_THEME_FILE) || '', setTheme);
 watchRuntimeFile(PLUGIN_SETTINGS_FILE, () => settings.readPluginSettings(PLUGIN_SETTINGS_FILE), setPluginSettings);
 
-const blockedPatternCount = plugins.block.length + plugins.requests.reduce((count, request) => count + request.urls.length, 0);
+const blockedPatternCount =
+  plugins.block.length + plugins.requests.reduce((count, request) => count + request.urls.length, 0);
 if (blockedPatternCount) {
   setInterval(() => {
     if (blockedCount) console.log(`[slick-byoe] blocked ${blockedCount} network request(s) so far`);
@@ -385,7 +386,7 @@ if (blockedPatternCount) {
 }
 
 console.log(
-    `[slick-byoe] armed: theme ${theme.name ? `"${theme.name}" (${theme.css.length} bytes)` : 'none'}` +
+  `[slick-byoe] armed: theme ${theme.name ? `"${theme.name}" (${theme.css.length} bytes)` : 'none'}` +
     ` + ${plugins.loaded.length} plugin(s): ${plugins.loaded.join(', ') || 'none'}` +
     (blockedPatternCount ? ` | blocking ${blockedPatternCount} URL pattern(s)` : ''),
 );
