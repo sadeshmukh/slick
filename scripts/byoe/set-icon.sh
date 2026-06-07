@@ -3,10 +3,17 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 APP="$HOME/Applications/Slick.app"
+REGISTER=1
+for arg in "$@"; do
+  case "$arg" in
+    --no-register) REGISTER=0 ;;
+    -*) echo "usage: scripts/byoe/set-icon.sh [app-path] [--no-register]"; exit 2 ;;
+    *) APP="$arg" ;;
+  esac
+done
 PL="$APP/Contents/Info.plist"
 ICNS="$ROOT/assets/desktop.icns"
 
-[ "$#" -eq 0 ] || { echo "usage: scripts/byoe/set-icon.sh"; exit 2; }
 [ -d "$APP" ] || { echo "Slick.app not found at $APP; run ./install.sh first."; exit 1; }
 [ -f "$ICNS" ] || { echo "icon not found: $ICNS"; exit 1; }
 
@@ -25,7 +32,9 @@ fi
 echo "signing app bundle (slow on a fresh build, hang tight)..."
 /usr/bin/codesign --force --deep --sign - "$APP"
 touch "$APP"
-echo "registering with Launch Services..."
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
-killall Dock 2>/dev/null || true
+if [ "$REGISTER" -eq 1 ]; then
+  echo "registering with Launch Services..."
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
+  killall Dock 2>/dev/null || true
+fi
 echo "installed icon -> $APP/Contents/Resources/$ICONKEY ($(du -h "$APP/Contents/Resources/$ICONKEY" | cut -f1))"
