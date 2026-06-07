@@ -6,3 +6,4 @@ dist/
 node_modules/
 byoe/node_modules/
 themes/.active
+.env
