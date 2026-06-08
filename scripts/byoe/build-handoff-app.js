@@ -111,6 +111,8 @@ function main() {
   const target = path.resolve(opts.target);
   const profile = path.resolve(opts.profile);
   const sourceApp = path.resolve(opts.sourceApp);
+  const activeThemeFile = path.join(ROOT, 'themes/.active');
+  const defaultTheme = fs.existsSync(activeThemeFile) ? fs.readFileSync(activeThemeFile, 'utf8').trim() : '';
 
   if (!fs.existsSync(sourceApp)) throw new Error(`BYOE Electron missing at ${sourceApp}`);
   if (!opts.allowNonTmp && !target.startsWith('/tmp/') && !target.startsWith('/private/tmp/')) {
@@ -161,7 +163,8 @@ const path = require('path');
 const { app, dialog, shell } = require('electron');
 
 const SLICK_ROOT = path.join(process.resourcesPath, 'slick');
-const PROFILE = process.env.SLICK_HANDOFF_PROFILE || path.join(app.getPath('appData'), 'Slack');
+const PROFILE = process.env.SLICK_HANDOFF_PROFILE || path.join(app.getPath('appData'), 'Slick');
+const DEFAULT_THEME = ${JSON.stringify(defaultTheme)};
 const SLACK_RESOURCES = ${JSON.stringify(SLACK_RESOURCES)};
 const SLACK_ASAR = ${JSON.stringify(SLACK_ASAR)};
 
@@ -208,11 +211,12 @@ function preflight() {
 
 function seedSettings() {
   try {
-    const enabled = path.join(PROFILE, 'slick', 'enabled-plugins.json');
-    if (!fs.existsSync(enabled)) {
-      fs.mkdirSync(path.dirname(enabled), { recursive: true });
-      fs.copyFileSync(path.join(SLICK_ROOT, 'plugins/enabled.json'), enabled);
-    }
+    const dir = path.join(PROFILE, 'slick');
+    fs.mkdirSync(dir, { recursive: true });
+    const enabled = path.join(dir, 'enabled-plugins.json');
+    if (!fs.existsSync(enabled)) fs.copyFileSync(path.join(SLICK_ROOT, 'plugins/enabled.json'), enabled);
+    const activeTheme = path.join(dir, 'active-theme');
+    if (DEFAULT_THEME && !fs.existsSync(activeTheme)) fs.writeFileSync(activeTheme, DEFAULT_THEME);
   } catch {}
 }
 
