@@ -3,6 +3,11 @@
   <br />Slick
 </h1>
 <h3 align="center">The coolest Slack client mod for MacOS</h3>
+<div align="center">
+  <img alt="GitHub Release" src="https://img.shields.io/github/v/release/3kh0/slick?logo=github&label=Latest%20Release">
+  <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/3kh0/slick/total?label=Downloads&logo=github">
+  <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/3kh0/slick?style=flat&logo=github&label=Stars&color=yellow">
+</div>
 
 > [!CAUTION]
 > This is in early alpha and may not be even allowed by Salesforce. Expect breakage, bugs, and random crashes. Consider using a alt account for testing. Information here may be inaccurate or incomplete, but the code is open source and you can inspect it yourself. No help will be provided for running or modifying it.
