@@ -74,7 +74,7 @@ module.exports = {
 
 Every plugin must provide the `meta` object and it must export at least one of `main`, `css`, or `renderer`. If these conditions are not met, we will laugh at you.
 
-## UserSettings
+## User Settings
 
 User Settings let users configure the fine details of your plugin. They are declared in `index.js` and rendered automatically in Slick Preferences with a neat little settings cog next to your plugin name.
 
