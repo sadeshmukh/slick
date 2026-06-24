@@ -10,7 +10,7 @@
 </div>
 
 > [!CAUTION]
-> This is in early alpha and may not be even allowed by Salesforce. Expect breakage, bugs, and random crashes. Consider using a alt account for testing. Information here may be inaccurate or incomplete, but the code is open source and you can inspect it yourself. No help will be provided for running or modifying it.
+> This is in early alpha and may not be even allowed by Salesforce. Expect breakage, bugs, and random crashes. Information here may be inaccurate or incomplete, but the code is open source and you can inspect it yourself.
 
 ![screenshot](https://cdn.hackclub.com/019e981c-32d4-7312-9e7c-b6836219afb1/image.jpg)
 
@@ -90,7 +90,7 @@ You also have some nice flags to play around with locally: `-Uninstall`, `-Purge
 
 Slick releases use integer build tags: `v13`, `v14`, `v15`, and so on. The GitHub Release title should read like `Slick Build 67`.
 
-Internally, release builds still use a normal macOS short version string (`1.0.13` for build 13), while the real bundle build number is just `67`.
+Internally, release builds use a normal macOS short version (`1.0.<build>`, e.g. `1.0.67` for build 67), while the bundle build number (`CFBundleVersion`) is just the integer `67`.
 
 To ship the next build, tag and push the next integer:
 
