@@ -3,6 +3,22 @@
 const path = require('path');
 const { execFile } = require('child_process');
 const electron = require('electron');
+
+function isLinuxSlackUrl(value) {
+  return typeof value === 'string' && /^slack:/i.test(value);
+}
+
+if (process.platform === 'linux') {
+  process.argv = process.argv.filter((arg) => !isLinuxSlackUrl(arg));
+
+  const { shell } = electron;
+  const origOpenExternal = shell.openExternal.bind(shell);
+  shell.openExternal = function patchedOpenExternal(url, ...rest) {
+    if (isLinuxSlackUrl(url)) return Promise.resolve();
+    return origOpenExternal(url, ...rest);
+  };
+}
+
 const { app, session, Notification } = electron;
 const PLUGINS_DIR = path.join(__dirname, '..', '..', 'plugins');
 require('./switches').applySwitches({
