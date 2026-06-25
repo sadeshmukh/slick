@@ -19,7 +19,7 @@ const originalSetDefault = app.setAsDefaultProtocolClient.bind(app);
 app.setAsDefaultProtocolClient = function patchedSetAsDefaultProtocolClient(protocol, executablePath, args) {
   if (
     protocol === PROTOCOL &&
-    process.platform === 'darwin' &&
+    (process.platform === 'darwin' || process.platform === 'linux') &&
     process.env.SLICK_HANDOFF_FORCE_TARGET !== '0' &&
     !executablePath &&
     !args
@@ -58,6 +58,26 @@ const helperOpenUrlListener = function captureOpenUrl(event, url) {
 };
 originalOn('open-url', helperOpenUrlListener);
 
-if (process.platform === 'darwin') {
+function focusExistingWindow() {
+  const { BrowserWindow } = require('electron');
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    if (window.isMinimized()) window.restore();
+    window.focus();
+    return true;
+  }
+  return false;
+}
+
+if (process.platform === 'linux') {
+  const gotLock = app.requestSingleInstanceLock();
+  if (!gotLock) {
+    app.quit();
+  } else {
+    app.on('second-instance', focusExistingWindow);
+    app.on('open-url', focusExistingWindow);
+    registerSlackProtocol(originalSetDefault);
+  }
+} else if (process.platform === 'darwin') {
   registerSlackProtocol(originalSetDefault);
 }
