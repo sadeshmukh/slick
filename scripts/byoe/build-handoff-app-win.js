@@ -87,17 +87,6 @@ function copyRuntime(resources) {
   });
 }
 
-function seedSettings(profile) {
-  const settings = path.join(profile, 'slick');
-  const enabled = path.join(settings, 'enabled-plugins.json');
-  const activeTheme = path.join(settings, 'active-theme');
-  fs.mkdirSync(settings, { recursive: true });
-  if (!fs.existsSync(enabled)) fs.copyFileSync(path.join(ROOT, 'plugins/enabled.json'), enabled);
-  if (!fs.existsSync(activeTheme) && fs.existsSync(path.join(ROOT, 'themes/.active'))) {
-    fs.copyFileSync(path.join(ROOT, 'themes/.active'), activeTheme);
-  }
-}
-
 function indexSource(opts, defaultTheme, profile) {
   return `'use strict';
 
@@ -108,7 +97,7 @@ const crypto = require('crypto');
 const { app, dialog, shell, BrowserWindow } = require('electron');
 
 const SLICK_ROOT = path.join(process.resourcesPath, 'slick');
-const PROFILE = process.env.SLICK_HANDOFF_PROFILE || ${JSON.stringify(profile)};
+const PROFILE = process.env.SLICK_HANDOFF_PROFILE || ${opts.profile ? JSON.stringify(profile) : "path.join(process.env.APPDATA || app.getPath('appData'), 'Slick')"};
 const DEFAULT_THEME = ${JSON.stringify(defaultTheme)};
 const SLICK_VERSION = ${JSON.stringify(opts.appVersion)};
 const SLICK_BUILD = parseInt(${JSON.stringify(opts.buildNumber)}, 10) || 0;
@@ -607,7 +596,6 @@ function main() {
 
   const res = path.join(target, 'resources');
   copyRuntime(res);
-  seedSettings(profile);
 
   const files = [
     {
