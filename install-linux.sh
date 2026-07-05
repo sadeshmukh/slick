@@ -15,12 +15,24 @@ SLACK_PATHS=(
 NO_LAUNCH=0
 
 step() { printf '\033[1;35m==>\033[0m \033[1m%s\033[0m\n' "$*"; }
-die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+die() {
+  printf '\033[1;31merror:\033[0m %s\n' "$*" >&2
+  exit 1
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --no-launch) NO_LAUNCH=1 ;;
-    *) die "unknown argument: $1" ;;
+  --no-launch) NO_LAUNCH=1 ;;
+  --restore-handler)
+    command -v xdg-mime >/dev/null 2>&1 || die "xdg-mime not found; can't manage the slack:// handler on this system."
+    xdg-mime default slack.desktop x-scheme-handler/slack &&
+      {
+        echo "slack:// now opens the official Slack again."
+        exit 0
+      } ||
+      die "could not restore handler"
+    ;;
+  *) die "unknown argument: $1" ;;
   esac
   shift
 done
@@ -29,7 +41,10 @@ find_slack() {
   local dir
   for dir in "${SLACK_PATHS[@]}"; do
     [ -n "$dir" ] || continue
-    [ -f "$dir/resources/app.asar" ] && { printf '%s\n' "$dir"; return 0; }
+    [ -f "$dir/resources/app.asar" ] && {
+      printf '%s\n' "$dir"
+      return 0
+    }
   done
   return 1
 }
@@ -60,7 +75,10 @@ matching_system_electron() {
   for bin in "/usr/lib/electron$major/electron" "/usr/lib/electron/electron"; do
     [ -x "$bin" ] || continue
     version="$(electron_version "$bin" || true)"
-    [ "${version%%.*}" = "$major" ] && { printf '%s\n' "$bin"; return 0; }
+    [ "${version%%.*}" = "$major" ] && {
+      printf '%s\n' "$bin"
+      return 0
+    }
   done
   return 1
 }
@@ -78,8 +96,8 @@ matching_byoe_electron() {
 step "Checking prerequisites"
 [ "$(uname -s)" = "Linux" ] || die "install-linux.sh only supports Linux."
 command -v node >/dev/null 2>&1 || die "Node.js 18+ is required."
-node -e 'process.exit(parseInt(process.versions.node, 10) >= 18 ? 0 : 1)' 2>/dev/null \
-  || die "Node.js 18+ is required (found: $(node -v 2>/dev/null || echo none))."
+node -e 'process.exit(parseInt(process.versions.node, 10) >= 18 ? 0 : 1)' 2>/dev/null ||
+  die "Node.js 18+ is required (found: $(node -v 2>/dev/null || echo none))."
 
 SLACK="$(find_slack)" || die "Slack not found. Install the official Slack .deb from https://slack.com/downloads/linux, then rerun."
 EVER="$(slack_electron_version "$SLACK" || true)"
@@ -104,12 +122,35 @@ else
     die "Need bun or npm to install Electron."
   fi
   [ -x "$EBIN" ] || node node_modules/electron/install.js || true
+  if [ ! -x "$EBIN" ]; then
+    command -v unzip >/dev/null 2>&1 || die "Electron install failed and unzip is missing to recover from cache."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+    aarch64) ARCH=arm64 ;;
+    *) ARCH=x64 ;;
+    esac
+    CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/electron"
+    ZIP="$(find "$CACHE" -maxdepth 1 -name "electron-v$EVER-linux-$ARCH.zip" 2>/dev/null | head -1)"
+    [ -n "$ZIP" ] || ZIP="$(find "$CACHE" -maxdepth 1 -name "electron-v$EMAJOR.*-linux-$ARCH.zip" 2>/dev/null | sort -V | tail -1)"
+    [ -n "$ZIP" ] || die "Electron install failed: no electron binary and no cached zip to extract."
+    step "Extracting $(basename "$ZIP") manually"
+    mkdir -p "$EDIST" && unzip -oq "$ZIP" -d "$EDIST"
+  fi
   matching_byoe_electron "$EMAJOR" >/dev/null || die "Electron install failed or did not match major $EMAJOR."
   cd "$ROOT"
 fi
 
-step "Building $TARGET"
-node "$ROOT/scripts/byoe/build-handoff-linux.js" --target "$TARGET" --force >/dev/null
+BUILD=""
+if command -v git >/dev/null 2>&1; then
+  BUILD="$(git -C "$ROOT" tag --list 'v[0-9]*' --sort=-v:refname 2>/dev/null |
+    sed -nE 's/^v([1-9][0-9]*)$/\1/p' | head -1 || true)"
+fi
+BUILD="${BUILD:-0}"
+VERSION="1.0.$BUILD"
+
+step "Building $TARGET (Build $BUILD)"
+node "$ROOT/scripts/byoe/build-handoff-linux.js" --target "$TARGET" \
+  --app-version "$VERSION" --build-number "$BUILD" --force >/dev/null
 
 step "Installing desktop integration"
 mkdir -p "$HOME/.local/share/icons/hicolor/256x256/apps" "$HOME/.local/share/applications"
@@ -135,4 +176,5 @@ Things to know:
 - First launch shows a sign-in screen (separate profile from official Slack). Sign in once; it persists.
 - Configure at Preferences -> Slick.
 - Manual launch: ./scripts/launch-linux.sh
+- Make slack:// open the official Slack again: ./install-linux.sh --restore-handler
 EOF
