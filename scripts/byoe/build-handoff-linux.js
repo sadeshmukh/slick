@@ -110,7 +110,7 @@ function getElectronVersion(slackDir) {
   try {
     const version = parseVersion(fs.readFileSync(versionFile, 'utf8').trim());
     if (version) return version;
-  } catch {}
+  } catch { }
 
   const bin = path.join(slackDir, 'slack');
   if (fs.existsSync(bin)) {
@@ -149,7 +149,7 @@ function findBestElectron(slackMajor) {
   return null;
 }
 
-function wrapperSource(defaultTheme) {
+function wrapperSource(defaultTheme, slackResources) {
   return `'use strict';
 
 const fs = require('fs');
@@ -161,7 +161,8 @@ const WRAPPER_RESOURCES = path.dirname(__dirname);
 const SLICK_ROOT = path.join(WRAPPER_RESOURCES, 'slick');
 const PROFILE = process.env.SLICK_HANDOFF_PROFILE || path.join(os.homedir(), '.config', 'slick');
 const DEFAULT_THEME = ${JSON.stringify(defaultTheme)};
-const SLACK_ASAR = path.join(WRAPPER_RESOURCES, 'slack.asar');
+const SLACK_RESOURCES = process.env.SLICK_SLACK_RESOURCES || ${JSON.stringify(slackResources)};
+const SLACK_ASAR = path.join(SLACK_RESOURCES, 'app.asar');
 
 function seedSettings() {
   try {
@@ -178,7 +179,7 @@ app.setPath('userData', PROFILE);
 seedSettings();
 
 try {
-  Object.defineProperty(process, 'resourcesPath', { configurable: true, value: WRAPPER_RESOURCES });
+  Object.defineProperty(process, 'resourcesPath', { configurable: true, value: SLACK_RESOURCES });
 } catch {}
 
 const getAppPath = app.getAppPath.bind(app);
@@ -226,17 +227,12 @@ function main() {
   }
 
   const resources = path.join(target, 'resources');
+  const slackResources = path.join(slackDir, 'resources');
   const profile = path.join(process.env.HOME || '', '.config', 'slick');
   const activeThemeFile = path.join(ROOT, 'themes/.active');
   const defaultTheme = fs.existsSync(activeThemeFile) ? fs.readFileSync(activeThemeFile, 'utf8').trim() : '';
   fs.mkdirSync(resources, { recursive: true });
   fs.symlinkSync(electron.bin, path.join(target, 'electron'));
-  fs.copyFileSync(path.join(slackDir, 'resources', 'app.asar'), path.join(resources, 'slack.asar'));
-
-  const unpacked = path.join(slackDir, 'resources', 'app.asar.unpacked');
-  if (fs.existsSync(unpacked)) {
-    fs.cpSync(unpacked, path.join(resources, 'slack.asar.unpacked'), { recursive: true });
-  }
 
   fs.writeFileSync(path.join(resources, '.electron-version'), `${slackElectronVersion}\n`);
   copyRuntime(resources);
@@ -247,7 +243,7 @@ function main() {
         name: 'package.json',
         contents: `${JSON.stringify({ name: 'slick', productName: 'Slick', version: '1.0.0', main: 'index.js' }, null, 2)}\n`,
       },
-      { name: 'index.js', contents: wrapperSource(defaultTheme) },
+      { name: 'index.js', contents: wrapperSource(defaultTheme, slackResources) },
     ],
     path.join(resources, 'app.asar'),
   );

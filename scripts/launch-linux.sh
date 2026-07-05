@@ -6,7 +6,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="$ROOT/byoe/slick-linux"
 EBIN="$TARGET/electron"
 WRAPPER_ASAR="$TARGET/resources/app.asar"
-SLACK_ASAR="$TARGET/resources/slack.asar"
 
 DEBUG=()
 OZONE=()
@@ -32,7 +31,6 @@ export SLICK_LAUNCH_T0
 
 [ -e "$EBIN" ] || { echo "BYOE Electron missing, run ./install-linux.sh"; exit 1; }
 [ -f "$WRAPPER_ASAR" ] || { echo "Wrapper ASAR missing, run ./install-linux.sh"; exit 1; }
-[ -f "$SLACK_ASAR" ] || { echo "Slack ASAR missing, run ./install-linux.sh"; exit 1; }
 
 SVER="$(cat "$TARGET/resources/.electron-version" 2>/dev/null || true)"
 REAL_EBIN="$(readlink -f "$EBIN" 2>/dev/null || printf '%s\n' "$EBIN")"
