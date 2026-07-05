@@ -6,7 +6,8 @@ const https = require('https');
 const { execFile, spawn } = require('child_process');
 const { app, dialog, shell, BrowserWindow } = require('electron');
 
-const MAC = process.platform === 'darwin';
+const PLATFORM = process.platform === 'darwin' ? 'darwin' : process.platform === 'win32' ? 'win32' : 'linux';
+const MAC = PLATFORM === 'darwin';
 const CINT = 6 * 60 * 60 * 1000;
 
 function fmtBytes(n) {
@@ -53,13 +54,13 @@ function progressHtml() {
     '.foot{display:flex;justify-content:space-between;gap:12px;margin-top:11px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}';
   const theme = MAC
     ? ':root{color-scheme:light dark;--fg:#1d1d1f;--muted:rgba(60,60,67,.6);--track:rgba(60,60,67,.13);--accent:#007aff}' +
-      '@media (prefers-color-scheme:dark){:root{--fg:#f5f5f7;--muted:rgba(235,235,245,.6);--track:rgba(235,235,245,.15);--accent:#0a84ff}}' +
-      'html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;background:transparent;color:var(--fg);-webkit-user-select:none;cursor:default}' +
-      '.head{-webkit-app-region:drag}' +
-      '#title{letter-spacing:-.01em}'
+    '@media (prefers-color-scheme:dark){:root{--fg:#f5f5f7;--muted:rgba(235,235,245,.6);--track:rgba(235,235,245,.15);--accent:#0a84ff}}' +
+    'html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;background:transparent;color:var(--fg);-webkit-user-select:none;cursor:default}' +
+    '.head{-webkit-app-region:drag}' +
+    '#title{letter-spacing:-.01em}'
     : ':root{color-scheme:light dark;--bg:#f3f3f3;--fg:#1a1a1a;--muted:#5f5f5f;--track:rgba(0,0,0,.1);--accent:#0078d4}' +
-      '@media (prefers-color-scheme:dark){:root{--bg:#202020;--fg:#fafafa;--muted:#a0a0a0;--track:rgba(255,255,255,.12);--accent:#4cc2ff}}' +
-      'html,body{margin:0;height:100%;font-family:"Segoe UI Variable Text","Segoe UI",sans-serif;background:var(--bg);color:var(--fg);user-select:none;cursor:default}';
+    '@media (prefers-color-scheme:dark){:root{--bg:#202020;--fg:#fafafa;--muted:#a0a0a0;--track:rgba(255,255,255,.12);--accent:#4cc2ff}}' +
+    'html,body{margin:0;height:100%;font-family:"Segoe UI Variable Text","Segoe UI",sans-serif;background:var(--bg);color:var(--fg);user-select:none;cursor:default}';
   return (
     '<!doctype html><html><head><meta charset="utf-8"><style>' +
     theme +
@@ -99,7 +100,7 @@ function create({ version, build, profile }) {
       const file = statePath();
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, JSON.stringify(state, null, 2) + '\n');
-    } catch {}
+    } catch { }
   }
 
   function fetchLatestRelease() {
@@ -134,15 +135,12 @@ function create({ version, build, profile }) {
   }
 
   function pickAsset(release) {
-    const suffix = process.arch === 'arm64' ? '-arm64.zip' : '-x64.zip';
+    const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+    const suffix =
+      PLATFORM === 'darwin' ? `-${arch}.zip` : PLATFORM === 'win32' ? `-win32-${arch}.zip` : `-linux-${arch}.tar.gz`;
     return (
-      ((release && release.assets) || []).find(
-        (a) =>
-          a &&
-          typeof a.name === 'string' &&
-          (MAC ? a.name.indexOf('win32') === -1 : a.name.indexOf('win32') !== -1) &&
-          a.name.endsWith(suffix),
-      ) || null
+      ((release && release.assets) || []).find((a) => a && typeof a.name === 'string' && a.name.endsWith(suffix)) ||
+      null
     );
   }
 
@@ -184,17 +182,20 @@ function create({ version, build, profile }) {
   }
 
   function extract(zip, dir) {
-    const [cmd, args] = MAC
-      ? ['/usr/bin/ditto', ['-x', '-k', zip, dir]]
-      : [
-          'powershell.exe',
-          [
-            '-NoProfile',
-            '-NonInteractive',
-            '-Command',
-            'Expand-Archive -LiteralPath ' + psq(zip) + ' -DestinationPath ' + psq(dir) + ' -Force',
-          ],
-        ];
+    const [cmd, args] =
+      PLATFORM === 'darwin'
+        ? ['/usr/bin/ditto', ['-x', '-k', zip, dir]]
+        : PLATFORM === 'linux'
+          ? ['/usr/bin/tar', ['-xzf', zip, '-C', dir]]
+          : [
+            'powershell.exe',
+            [
+              '-NoProfile',
+              '-NonInteractive',
+              '-Command',
+              'Expand-Archive -LiteralPath ' + psq(zip) + ' -DestinationPath ' + psq(dir) + ' -Force',
+            ],
+          ];
     return new Promise((resolve, reject) => {
       execFile(cmd, args, (e) => (e ? reject(e) : resolve()));
     });
@@ -206,6 +207,16 @@ function create({ version, build, profile }) {
       const sh =
         'APP="$1"; STAGE="$2"; PID="$3"; while kill -0 "$PID" 2>/dev/null; do sleep 0.2; done; rm -rf "$APP.old"; mv "$APP" "$APP.old" 2>/dev/null || true; if /usr/bin/ditto "$STAGE" "$APP"; then rm -rf "$APP.old"; else rm -rf "$APP"; mv "$APP.old" "$APP" 2>/dev/null || true; fi; rm -rf "$(dirname "$STAGE")"; open "$APP"';
       spawn('/bin/sh', ['-c', sh, 'slick-updater', appPath, stage, String(process.pid)], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+      return;
+    }
+    if (PLATFORM === 'linux') {
+      const appDir = path.dirname(process.execPath);
+      const sh =
+        'APP="$1"; STAGE="$2"; PID="$3"; while kill -0 "$PID" 2>/dev/null; do sleep 0.2; done; rm -rf "$APP.old"; mv "$APP" "$APP.old" 2>/dev/null || true; if mv "$STAGE" "$APP"; then rm -rf "$APP.old"; else rm -rf "$APP"; mv "$APP.old" "$APP" 2>/dev/null || true; fi; rm -rf "$(dirname "$STAGE")"; "$APP/electron" --no-sandbox "$APP/resources/app.asar" >/dev/null 2>&1 &';
+      spawn('/bin/sh', ['-c', sh, 'slick-updater', appDir, stage, String(process.pid)], {
         detached: true,
         stdio: 'ignore',
       }).unref();
@@ -252,7 +263,7 @@ function create({ version, build, profile }) {
       if (!w || w.isDestroyed() || w === progressWin) continue;
       try {
         w.setProgressBar(frac);
-      } catch {}
+      } catch { }
     }
   }
 
@@ -260,7 +271,7 @@ function create({ version, build, profile }) {
     if (!progressWin || progressWin.isDestroyed() || !progressData) return;
     progressWin.webContents
       .executeJavaScript('window.__update && window.__update(' + JSON.stringify(progressData) + ')')
-      .catch(() => {});
+      .catch(() => { });
   }
 
   function setProgress(data) {
@@ -292,7 +303,7 @@ function create({ version, build, profile }) {
     progressWin = new BrowserWindow(opts);
     try {
       MAC ? progressWin.setMenu(null) : progressWin.setMenuBarVisibility(false);
-    } catch {}
+    } catch { }
     progressWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(progressHtml()));
     progressWin.webContents.on('did-finish-load', flushProgress);
     progressWin.once('ready-to-show', () => {
@@ -342,27 +353,27 @@ function create({ version, build, profile }) {
         setProgress(
           total
             ? {
-                title: 'Downloading update',
-                status,
-                percent: pct,
-                pctText: pct + '%',
-                detail:
-                  fmtBytes(received) +
-                  ' / ' +
-                  fmtBytes(total) +
-                  '  ·  ' +
-                  rate +
-                  '  ·  ' +
-                  fmtEta((total - received) / speed) +
-                  ' left',
-              }
+              title: 'Downloading update',
+              status,
+              percent: pct,
+              pctText: pct + '%',
+              detail:
+                fmtBytes(received) +
+                ' / ' +
+                fmtBytes(total) +
+                '  ·  ' +
+                rate +
+                '  ·  ' +
+                fmtEta((total - received) / speed) +
+                ' left',
+            }
             : {
-                title: 'Downloading update',
-                status,
-                indeterminate: true,
-                pctText: '',
-                detail: fmtBytes(received) + ' downloaded  ·  ' + rate,
-              },
+              title: 'Downloading update',
+              status,
+              indeterminate: true,
+              pctText: '',
+              detail: fmtBytes(received) + ' downloaded  ·  ' + rate,
+            },
         );
       });
       setp(0.95);
@@ -377,7 +388,7 @@ function create({ version, build, profile }) {
       closeProgressWindow();
       try {
         fs.rmSync(dir, { recursive: true, force: true });
-      } catch {}
+      } catch { }
       return dialog
         .showMessageBox({
           type: 'error',
@@ -391,7 +402,7 @@ function create({ version, build, profile }) {
         .then(({ response }) => {
           if (response === 0) shell.openExternal(release.html_url || 'https://github.com/3kh0/slick/releases');
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     setp(-1);
@@ -412,7 +423,7 @@ function create({ version, build, profile }) {
     }
     try {
       fs.rmSync(dir, { recursive: true, force: true });
-    } catch {}
+    } catch { }
   }
 
   function promptDownload(release, latestBuild) {
@@ -430,7 +441,7 @@ function create({ version, build, profile }) {
         if (response === 0) return perform(release);
         return undefined;
       })
-      .catch(() => {});
+      .catch(() => { });
   }
 
   async function checkForUpdates() {
@@ -468,7 +479,7 @@ function create({ version, build, profile }) {
           detail: 'This is a development build, so Slick cannot check for updates.',
           buttons: ['OK'],
         })
-        .catch(() => {});
+        .catch(() => { });
       return;
     }
 
@@ -485,7 +496,7 @@ function create({ version, build, profile }) {
           detail: String((err && err.message) || err) + '. Try again later.',
           buttons: ['OK'],
         })
-        .catch(() => {});
+        .catch(() => { });
       return;
     }
 
@@ -499,7 +510,7 @@ function create({ version, build, profile }) {
           detail: 'Build ' + build + ' is the newest available.',
           buttons: ['OK'],
         })
-        .catch(() => {});
+        .catch(() => { });
       return;
     }
 
@@ -521,7 +532,7 @@ function create({ version, build, profile }) {
         const delay = state.lastCheckedAt ? Math.max(30 * 1000, CINT - elapsed) : 30 * 1000;
         setTimeout(run, delay);
       })
-      .catch(() => {});
+      .catch(() => { });
   }
 
   return { readState, scheduleUpdateChecks, manualCheckForUpdates };

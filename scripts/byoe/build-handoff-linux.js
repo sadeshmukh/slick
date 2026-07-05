@@ -15,15 +15,20 @@ const LINUX_SLACK_PATHS = [
 ].filter(Boolean);
 const DEFAULTS = {
   target: path.join(ROOT, 'byoe', 'slick-linux'),
+  appVersion: '1.0.0',
+  buildNumber: '0',
   force: false,
 };
 
 function usage() {
   console.error(`Usage:
-  node scripts/byoe/build-handoff-linux.js [--target <dir>] [--force]
+  node scripts/byoe/build-handoff-linux.js [--target <dir>] [--app-version <x.y.z>]
+                                           [--build-number <n>] [--force]
 
 Defaults:
-  --target ${DEFAULTS.target}`);
+  --target       ${DEFAULTS.target}
+  --app-version  ${DEFAULTS.appVersion}
+  --build-number ${DEFAULTS.buildNumber}`);
   process.exit(2);
 }
 
@@ -31,6 +36,8 @@ function parseArgs(argv) {
   const o = { ...DEFAULTS };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--target') o.target = argv[++i] || usage();
+    else if (argv[i] === '--app-version') o.appVersion = argv[++i] || usage();
+    else if (argv[i] === '--build-number') o.buildNumber = argv[++i] || usage();
     else if (argv[i] === '--force') o.force = true;
     else usage();
   }
@@ -69,6 +76,7 @@ function copyRuntime(resources) {
     'scripts/byoe/settings-renderer.js',
     'scripts/byoe/settings-ui.js',
     'scripts/byoe/switches.js',
+    'scripts/byoe/updater.js',
     'scripts/theme.js',
   ]) {
     const target = path.join(runtime, file);
@@ -110,7 +118,7 @@ function getElectronVersion(slackDir) {
   try {
     const version = parseVersion(fs.readFileSync(versionFile, 'utf8').trim());
     if (version) return version;
-  } catch { }
+  } catch {}
 
   const bin = path.join(slackDir, 'slack');
   if (fs.existsSync(bin)) {
@@ -149,7 +157,7 @@ function findBestElectron(slackMajor) {
   return null;
 }
 
-function wrapperSource(defaultTheme, slackResources) {
+function wrapperSource(defaultTheme, slackResources, opts) {
   return `'use strict';
 
 const fs = require('fs');
@@ -161,6 +169,9 @@ const WRAPPER_RESOURCES = path.dirname(__dirname);
 const SLICK_ROOT = path.join(WRAPPER_RESOURCES, 'slick');
 const PROFILE = process.env.SLICK_HANDOFF_PROFILE || path.join(os.homedir(), '.config', 'slick');
 const DEFAULT_THEME = ${JSON.stringify(defaultTheme)};
+const SLICK_VERSION = ${JSON.stringify(opts.appVersion)};
+const SLICK_BUILD = parseInt(${JSON.stringify(opts.buildNumber)}, 10) || 0;
+const updater = require(path.join(SLICK_ROOT, 'scripts/byoe/updater.js')).create({ version: SLICK_VERSION, build: SLICK_BUILD, profile: PROFILE });
 const SLACK_RESOURCES = process.env.SLICK_SLACK_RESOURCES || ${JSON.stringify(slackResources)};
 const SLACK_ASAR = path.join(SLACK_RESOURCES, 'app.asar');
 
@@ -177,6 +188,7 @@ function seedSettings() {
 
 app.setPath('userData', PROFILE);
 seedSettings();
+updater.scheduleUpdateChecks();
 
 try {
   Object.defineProperty(process, 'resourcesPath', { configurable: true, value: SLACK_RESOURCES });
@@ -209,6 +221,8 @@ StartupWMClass=Slick
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
+  if (!/^\d+\.\d+\.\d+$/.test(opts.appVersion)) throw new Error('--app-version must look like x.y.z');
+  if (!/^(0|[1-9]\d*)$/.test(opts.buildNumber)) throw new Error('--build-number must be a non-negative integer');
   const target = path.resolve(opts.target);
   const slackDir = findSlack();
   if (!slackDir) throw new Error(`Slack not found. Probed: ${LINUX_SLACK_PATHS.join(', ')}`);
@@ -241,9 +255,9 @@ function main() {
     [
       {
         name: 'package.json',
-        contents: `${JSON.stringify({ name: 'slick', productName: 'Slick', version: '1.0.0', main: 'index.js' }, null, 2)}\n`,
+        contents: `${JSON.stringify({ name: 'slick', productName: 'Slick', version: opts.appVersion, main: 'index.js' }, null, 2)}\n`,
       },
-      { name: 'index.js', contents: wrapperSource(defaultTheme, slackResources) },
+      { name: 'index.js', contents: wrapperSource(defaultTheme, slackResources, opts) },
     ],
     path.join(resources, 'app.asar'),
   );
