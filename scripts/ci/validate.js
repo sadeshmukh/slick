@@ -9,17 +9,24 @@ const ROOT = path.join(__dirname, '..', '..');
 const errs = [];
 const fail = (f, msg) => errs.push(`${f}: ${msg}`);
 
-const BUILD_SCRIPT = path.join(ROOT, 'scripts/byoe/build-handoff-app.js');
-const buildSource = fs.readFileSync(BUILD_SCRIPT, 'utf8');
+const BUILD_SCRIPTS = [
+  'scripts/byoe/build-handoff-app.js',
+  'scripts/byoe/build-handoff-app-win.js',
+  'scripts/byoe/build-handoff-linux.js',
+].map((f) => path.join(ROOT, f));
 const injectFile = path.join(ROOT, 'scripts/byoe/inject.js');
 const injectSource = fs.readFileSync(injectFile, 'utf8');
-for (const match of injectSource.matchAll(/require\(['"](\.\.?\/[^'"]+)['"]\)/g)) {
-  const dependency = path
-    .relative(ROOT, require.resolve(path.resolve(path.dirname(injectFile), match[1])))
-    .replace(/\\/g, '/');
+for (const buildScript of BUILD_SCRIPTS) {
+  const buildSource = fs.readFileSync(buildScript, 'utf8');
+  const buildScriptRel = path.relative(ROOT, buildScript).replace(/\\/g, '/');
+  for (const match of injectSource.matchAll(/require\(['"](\.\.?\/[^'"]+)['"]\)/g)) {
+    const dependency = path
+      .relative(ROOT, require.resolve(path.resolve(path.dirname(injectFile), match[1])))
+      .replace(/\\/g, '/');
 
-  if (!buildSource.includes(`'${dependency}'`)) {
-    fail('scripts/byoe/build-handoff-app.js', `runtime copy list is missing "${dependency}" required by inject.js`);
+    if (!buildSource.includes(`'${dependency}'`)) {
+      fail(buildScriptRel, `runtime copy list is missing "${dependency}" required by inject.js`);
+    }
   }
 }
 
