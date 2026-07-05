@@ -89,9 +89,9 @@ You also have some nice flags to play around with locally: `-Uninstall`, `-Purge
 ## Linux (beta)
 
 > [!NOTE]
-> Linux support is basic and currently expects an x86_64 Linux machine for real Slack runtime testing. Apple Silicon arm64 VMs can build the wrapper, but official Slack for Linux is x86_64 only.
+> Linux support is new and x86_64-only. Slack doesn't ship an official arm64 Linux build, so there's nothing for an arm64 machine to run Slick against.
 
-Install the official Slack `.deb` first, then clone the repo and run:
+Install Slack from your distro first (deb, rpm, AUR, whatever your package manager offers), then clone the repo and run:
 
 ```bash
 ./install-linux.sh
@@ -104,7 +104,9 @@ This builds `byoe/slick-linux`, installs a desktop entry, registers `slack://`, 
 ./scripts/launch-linux.sh --debug 9223
 ```
 
-Known limitations: Electron must match Slack's Electron major version, Wayland/X11 handling is minimal, and `--no-sandbox` is used for the BYOE launcher.
+You also have some nice flags to play around with: `--restore-handler` on `install-linux.sh` to give `slack://` back to the official Slack app, and `./scripts/uninstall-linux.sh` to remove Slick entirely.
+
+Prebuilt `x86_64` tarballs are published on the [releases page](https://github.com/3kh0/slick/releases/latest) too. Extract one and run `Slick/electron` directly; desktop integration is only wired up by the source build (`install-linux.sh`) for now.
 
 ## Release versioning
 

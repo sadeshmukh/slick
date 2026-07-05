@@ -120,7 +120,7 @@ function getElectronVersion(slackDir) {
   try {
     const version = parseVersion(fs.readFileSync(versionFile, 'utf8').trim());
     if (version) return version;
-  } catch { }
+  } catch {}
 
   const bin = path.join(slackDir, 'slack');
   if (fs.existsSync(bin)) {
