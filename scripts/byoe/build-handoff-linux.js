@@ -15,6 +15,7 @@ const LINUX_SLACK_PATHS = [
 ].filter(Boolean);
 const DEFAULTS = {
   target: path.join(ROOT, 'byoe', 'slick-linux'),
+  sourceDist: '',
   appVersion: '1.0.0',
   buildNumber: '0',
   force: false,
@@ -22,8 +23,8 @@ const DEFAULTS = {
 
 function usage() {
   console.error(`Usage:
-  node scripts/byoe/build-handoff-linux.js [--target <dir>] [--app-version <x.y.z>]
-                                           [--build-number <n>] [--force]
+  node scripts/byoe/build-handoff-linux.js [--target <dir>] [--source-dist <electron/dist>]
+                                           [--app-version <x.y.z>] [--build-number <n>] [--force]
 
 Defaults:
   --target       ${DEFAULTS.target}
@@ -36,6 +37,7 @@ function parseArgs(argv) {
   const o = { ...DEFAULTS };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--target') o.target = argv[++i] || usage();
+    else if (argv[i] === '--source-dist') o.sourceDist = argv[++i] || usage();
     else if (argv[i] === '--app-version') o.appVersion = argv[++i] || usage();
     else if (argv[i] === '--build-number') o.buildNumber = argv[++i] || usage();
     else if (argv[i] === '--force') o.force = true;
@@ -157,13 +159,16 @@ function findBestElectron(slackMajor) {
   return null;
 }
 
-function wrapperSource(defaultTheme, slackResources, opts) {
+function wrapperSource(defaultTheme, opts) {
   return `'use strict';
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { app } = require('electron');
+const { app, dialog, shell } = require('electron');
+
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
 
 const WRAPPER_RESOURCES = path.dirname(__dirname);
 const SLICK_ROOT = path.join(WRAPPER_RESOURCES, 'slick');
@@ -172,8 +177,79 @@ const DEFAULT_THEME = ${JSON.stringify(defaultTheme)};
 const SLICK_VERSION = ${JSON.stringify(opts.appVersion)};
 const SLICK_BUILD = parseInt(${JSON.stringify(opts.buildNumber)}, 10) || 0;
 const updater = require(path.join(SLICK_ROOT, 'scripts/byoe/updater.js')).create({ version: SLICK_VERSION, build: SLICK_BUILD, profile: PROFILE });
-const SLACK_RESOURCES = process.env.SLICK_SLACK_RESOURCES || ${JSON.stringify(slackResources)};
+const RELEASES_URL = 'https://github.com/3kh0/slick/releases';
+
+const LINUX_SLACK_PATHS = [
+  process.env.SLICK_SLACK_DIR,
+  '/usr/lib/slack',
+  '/opt/Slack',
+  '/opt/slack',
+  path.join(os.homedir(), '.local/share/slack'),
+].filter(Boolean);
+
+function findSlackResources() {
+  for (const dir of LINUX_SLACK_PATHS) {
+    const res = path.join(dir, 'resources');
+    if (fs.existsSync(path.join(res, 'app.asar'))) return res;
+  }
+  return path.join(LINUX_SLACK_PATHS[0] || '/usr/lib/slack', 'resources');
+}
+
+const SLACK_RESOURCES = process.env.SLICK_SLACK_RESOURCES || findSlackResources();
 const SLACK_ASAR = path.join(SLACK_RESOURCES, 'app.asar');
+const SLACK_APP_DIR = path.dirname(SLACK_RESOURCES);
+
+function slackElectronVersion() {
+  try {
+    return fs.readFileSync(path.join(SLACK_APP_DIR, 'version'), 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
+
+function preflightProblem() {
+  if (process.env.SLICK_SKIP_PREFLIGHT === '1') return null;
+  if (!fs.existsSync(SLACK_ASAR)) return 'missing';
+  const slackElectron = slackElectronVersion();
+  if (slackElectron && slackElectron.split('.')[0] !== process.versions.electron.split('.')[0]) {
+    return 'mismatch:' + slackElectron;
+  }
+  return null;
+}
+
+function handlePreflight(problem) {
+  if (problem === 'missing') {
+    dialog.showMessageBoxSync({
+      type: 'error',
+      title: 'Slick',
+      message: 'Slack is not installed',
+      detail: 'Slick needs the official Slack Linux install. Install Slack, then open Slick again.',
+      buttons: ['Quit'],
+    });
+    return false;
+  }
+  const slackElectron = problem.slice('mismatch:'.length);
+  const choice = dialog.showMessageBoxSync({
+    type: 'error',
+    title: 'Slick',
+    message: 'This Slick build no longer matches Slack',
+    detail:
+      'Slack ships Electron ' +
+      slackElectron +
+      ', but this Slick build bundles Electron ' +
+      process.versions.electron +
+      '. Download the latest Slick release.',
+    buttons: ['Open Releases Page', 'Launch Anyway', 'Quit'],
+    defaultId: 0,
+    cancelId: 2,
+  });
+  if (choice === 0) shell.openExternal(RELEASES_URL);
+  if (choice === 1) {
+    process.env.SLICK_SKIP_PREFLIGHT = '1';
+    app.relaunch();
+  }
+  return false;
+}
 
 function seedSettings() {
   try {
@@ -186,30 +262,44 @@ function seedSettings() {
   } catch {}
 }
 
-app.setPath('userData', PROFILE);
-seedSettings();
-updater.scheduleUpdateChecks();
+function boot() {
+  app.setPath('userData', PROFILE);
+  try {
+    app.setAsDefaultProtocolClient('slack');
+  } catch {}
+  seedSettings();
+  updater.scheduleUpdateChecks();
 
-try {
-  Object.defineProperty(process, 'resourcesPath', { configurable: true, value: SLACK_RESOURCES });
-} catch {}
+  try {
+    Object.defineProperty(process, 'resourcesPath', { configurable: true, value: SLACK_RESOURCES });
+  } catch {}
 
-const getAppPath = app.getAppPath.bind(app);
-app.getAppPath = () => (process.env.SLICK_HANDOFF_KEEP_WRAPPER_APP_PATH === '1' ? getAppPath() : SLACK_ASAR);
+  const getAppPath = app.getAppPath.bind(app);
+  app.getAppPath = () => (process.env.SLICK_HANDOFF_KEEP_WRAPPER_APP_PATH === '1' ? getAppPath() : SLACK_ASAR);
 
-require(path.join(SLICK_ROOT, 'scripts/byoe/login-handoff.js'));
-require(path.join(SLICK_ROOT, 'scripts/byoe/inject.js'));
-require(SLACK_ASAR);
+  require(path.join(SLICK_ROOT, 'scripts/byoe/login-handoff.js'));
+  require(path.join(SLICK_ROOT, 'scripts/byoe/inject.js'));
+  require(SLACK_ASAR);
+}
+
+const problem = preflightProblem();
+if (!problem) {
+  boot();
+} else {
+  app.whenReady().then(() => {
+    handlePreflight(problem);
+    app.exit(problem === 'missing' ? 1 : 0);
+  });
+}
 `;
 }
 
 function writeDesktopFile(target) {
-  const launch = path.join(ROOT, 'scripts', 'launch-linux.sh');
   const desktop = `[Desktop Entry]
 Type=Application
 Name=Slick
 Comment=Slack client mod (BYOE)
-Exec=${launch} %U
+Exec=${path.join(target, 'electron')} ${path.join(target, 'resources/app.asar')} %U
 Icon=slick
 Terminal=false
 Categories=Network;InstantMessaging;
@@ -219,21 +309,38 @@ StartupWMClass=Slick
   fs.writeFileSync(path.join(target, 'slick.desktop'), desktop);
 }
 
+function resolveElectron(opts) {
+  if (opts.sourceDist) {
+    const dist = path.resolve(opts.sourceDist);
+    const bin = path.join(dist, 'electron');
+    if (!fs.existsSync(bin)) throw new Error(`BYOE Electron missing at ${dist} (no electron binary)`);
+    let version = '';
+    try {
+      version = parseVersion(fs.readFileSync(path.join(dist, 'version'), 'utf8').trim());
+    } catch {
+      version = electronVersion(bin);
+    }
+    return { bin, version, source: 'source-dist' };
+  }
+
+  const slackDir = findSlack();
+  if (!slackDir) throw new Error(`Slack not found. Probed: ${LINUX_SLACK_PATHS.join(', ')}`);
+  const slackElectron = getElectronVersion(slackDir);
+  if (!slackElectron) throw new Error(`Could not read Slack's Electron version from ${slackDir}`);
+  const slackMajor = parseInt(slackElectron, 10);
+  const electron = findBestElectron(slackMajor);
+  if (!electron) {
+    throw new Error(`No Electron ${slackMajor}.x found. Run ./install-linux.sh to install a matching BYOE Electron.`);
+  }
+  return electron;
+}
+
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (!/^\d+\.\d+\.\d+$/.test(opts.appVersion)) throw new Error('--app-version must look like x.y.z');
   if (!/^(0|[1-9]\d*)$/.test(opts.buildNumber)) throw new Error('--build-number must be a non-negative integer');
   const target = path.resolve(opts.target);
-  const slackDir = findSlack();
-  if (!slackDir) throw new Error(`Slack not found. Probed: ${LINUX_SLACK_PATHS.join(', ')}`);
-
-  const slackElectronVersion = getElectronVersion(slackDir);
-  if (!slackElectronVersion) throw new Error(`Could not read Slack's Electron version from ${slackDir}`);
-  const slackMajor = parseInt(slackElectronVersion, 10);
-  const electron = findBestElectron(slackMajor);
-  if (!electron) {
-    throw new Error(`No Electron ${slackMajor}.x found. Run ./install-linux.sh to install a matching BYOE Electron.`);
-  }
+  const electron = resolveElectron(opts);
 
   if (fs.existsSync(target)) {
     if (!opts.force) throw new Error(`${target} already exists; rerun with --force to replace it`);
@@ -241,14 +348,12 @@ function main() {
   }
 
   const resources = path.join(target, 'resources');
-  const slackResources = path.join(slackDir, 'resources');
   const profile = path.join(process.env.HOME || '', '.config', 'slick');
   const activeThemeFile = path.join(ROOT, 'themes/.active');
   const defaultTheme = fs.existsSync(activeThemeFile) ? fs.readFileSync(activeThemeFile, 'utf8').trim() : '';
   fs.mkdirSync(resources, { recursive: true });
   fs.symlinkSync(electron.bin, path.join(target, 'electron'));
 
-  fs.writeFileSync(path.join(resources, '.electron-version'), `${slackElectronVersion}\n`);
   copyRuntime(resources);
   seedSettings(profile);
   packAsar(
@@ -257,7 +362,7 @@ function main() {
         name: 'package.json',
         contents: `${JSON.stringify({ name: 'slick', productName: 'Slick', version: opts.appVersion, main: 'index.js' }, null, 2)}\n`,
       },
-      { name: 'index.js', contents: wrapperSource(defaultTheme, slackResources, opts) },
+      { name: 'index.js', contents: wrapperSource(defaultTheme, opts) },
     ],
     path.join(resources, 'app.asar'),
   );
@@ -270,8 +375,6 @@ function main() {
         electron: electron.bin,
         electronVersion: electron.version,
         electronSource: electron.source,
-        slack: slackDir,
-        slackElectronVersion,
         profile,
       },
       null,
