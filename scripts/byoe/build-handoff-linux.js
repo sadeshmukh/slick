@@ -120,7 +120,7 @@ function getElectronVersion(slackDir) {
   try {
     const version = parseVersion(fs.readFileSync(versionFile, 'utf8').trim());
     if (version) return version;
-  } catch {}
+  } catch { }
 
   const bin = path.join(slackDir, 'slack');
   if (fs.existsSync(bin)) {
@@ -299,7 +299,7 @@ function writeDesktopFile(target) {
 Type=Application
 Name=Slick
 Comment=Slack client mod (BYOE)
-Exec=${path.join(target, 'electron')} ${path.join(target, 'resources/app.asar')} %U
+Exec=${path.join(target, 'electron')} %U
 Icon=slick
 Terminal=false
 Categories=Network;InstantMessaging;
@@ -320,7 +320,7 @@ function resolveElectron(opts) {
     } catch {
       version = electronVersion(bin);
     }
-    return { bin, version, source: 'source-dist' };
+    return { bin, dist, version, source: 'source-dist' };
   }
 
   const slackDir = findSlack();
@@ -332,7 +332,7 @@ function resolveElectron(opts) {
   if (!electron) {
     throw new Error(`No Electron ${slackMajor}.x found. Run ./install-linux.sh to install a matching BYOE Electron.`);
   }
-  return electron;
+  return { ...electron, dist: path.dirname(electron.bin) };
 }
 
 function main() {
@@ -351,21 +351,19 @@ function main() {
   const profile = path.join(process.env.HOME || '', '.config', 'slick');
   const activeThemeFile = path.join(ROOT, 'themes/.active');
   const defaultTheme = fs.existsSync(activeThemeFile) ? fs.readFileSync(activeThemeFile, 'utf8').trim() : '';
-  fs.mkdirSync(resources, { recursive: true });
-  fs.symlinkSync(electron.bin, path.join(target, 'electron'));
+  fs.cpSync(electron.dist, target, { recursive: true });
 
   copyRuntime(resources);
   seedSettings(profile);
-  packAsar(
-    [
-      {
-        name: 'package.json',
-        contents: `${JSON.stringify({ name: 'slick', productName: 'Slick', version: opts.appVersion, main: 'index.js' }, null, 2)}\n`,
-      },
-      { name: 'index.js', contents: wrapperSource(defaultTheme, opts) },
-    ],
-    path.join(resources, 'app.asar'),
-  );
+  const files = [
+    {
+      name: 'package.json',
+      contents: `${JSON.stringify({ name: 'slick', productName: 'Slick', version: opts.appVersion, main: 'index.js' }, null, 2)}\n`,
+    },
+    { name: 'index.js', contents: wrapperSource(defaultTheme, opts) },
+  ];
+  fs.rmSync(path.join(resources, 'app'), { recursive: true, force: true });
+  for (const name of ['default_app.asar', 'app.asar']) packAsar(files, path.join(resources, name));
   writeDesktopFile(target);
 
   console.log(

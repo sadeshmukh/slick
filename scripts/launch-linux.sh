@@ -5,7 +5,6 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="$ROOT/byoe/slick-linux"
 EBIN="$TARGET/electron"
-WRAPPER_ASAR="$TARGET/resources/app.asar"
 
 DEBUG=()
 
@@ -26,9 +25,5 @@ export SLICK_LAUNCH_T0
   echo "BYOE Electron missing, run ./install-linux.sh"
   exit 1
 }
-[ -f "$WRAPPER_ASAR" ] || {
-  echo "Wrapper ASAR missing, run ./install-linux.sh"
-  exit 1
-}
 
-exec "$EBIN" "${DEBUG[@]}" "$WRAPPER_ASAR" "$@"
+exec "$EBIN" "${DEBUG[@]}" "$@"
