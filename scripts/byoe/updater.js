@@ -6,7 +6,8 @@ const https = require('https');
 const { execFile, spawn } = require('child_process');
 const { app, dialog, shell, BrowserWindow } = require('electron');
 
-const MAC = process.platform === 'darwin';
+const PLATFORM = process.platform === 'darwin' ? 'darwin' : process.platform === 'win32' ? 'win32' : 'linux';
+const MAC = PLATFORM === 'darwin';
 const CINT = 6 * 60 * 60 * 1000;
 
 function fmtBytes(n) {
@@ -134,15 +135,12 @@ function create({ version, build, profile }) {
   }
 
   function pickAsset(release) {
-    const suffix = process.arch === 'arm64' ? '-arm64.zip' : '-x64.zip';
+    const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+    const suffix =
+      PLATFORM === 'darwin' ? `-${arch}.zip` : PLATFORM === 'win32' ? `-win32-${arch}.zip` : `-linux-${arch}.tar.gz`;
     return (
-      ((release && release.assets) || []).find(
-        (a) =>
-          a &&
-          typeof a.name === 'string' &&
-          (MAC ? a.name.indexOf('win32') === -1 : a.name.indexOf('win32') !== -1) &&
-          a.name.endsWith(suffix),
-      ) || null
+      ((release && release.assets) || []).find((a) => a && typeof a.name === 'string' && a.name.endsWith(suffix)) ||
+      null
     );
   }
 
@@ -184,17 +182,20 @@ function create({ version, build, profile }) {
   }
 
   function extract(zip, dir) {
-    const [cmd, args] = MAC
-      ? ['/usr/bin/ditto', ['-x', '-k', zip, dir]]
-      : [
-          'powershell.exe',
-          [
-            '-NoProfile',
-            '-NonInteractive',
-            '-Command',
-            'Expand-Archive -LiteralPath ' + psq(zip) + ' -DestinationPath ' + psq(dir) + ' -Force',
-          ],
-        ];
+    const [cmd, args] =
+      PLATFORM === 'darwin'
+        ? ['/usr/bin/ditto', ['-x', '-k', zip, dir]]
+        : PLATFORM === 'linux'
+          ? ['/usr/bin/tar', ['-xzf', zip, '-C', dir]]
+          : [
+              'powershell.exe',
+              [
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                'Expand-Archive -LiteralPath ' + psq(zip) + ' -DestinationPath ' + psq(dir) + ' -Force',
+              ],
+            ];
     return new Promise((resolve, reject) => {
       execFile(cmd, args, (e) => (e ? reject(e) : resolve()));
     });
@@ -206,6 +207,16 @@ function create({ version, build, profile }) {
       const sh =
         'APP="$1"; STAGE="$2"; PID="$3"; while kill -0 "$PID" 2>/dev/null; do sleep 0.2; done; rm -rf "$APP.old"; mv "$APP" "$APP.old" 2>/dev/null || true; if /usr/bin/ditto "$STAGE" "$APP"; then rm -rf "$APP.old"; else rm -rf "$APP"; mv "$APP.old" "$APP" 2>/dev/null || true; fi; rm -rf "$(dirname "$STAGE")"; open "$APP"';
       spawn('/bin/sh', ['-c', sh, 'slick-updater', appPath, stage, String(process.pid)], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+      return;
+    }
+    if (PLATFORM === 'linux') {
+      const appDir = path.dirname(process.execPath);
+      const sh =
+        'APP="$1"; STAGE="$2"; PID="$3"; while kill -0 "$PID" 2>/dev/null; do sleep 0.2; done; rm -rf "$APP.old"; mv "$APP" "$APP.old" 2>/dev/null || true; if mv "$STAGE" "$APP"; then rm -rf "$APP.old"; else rm -rf "$APP"; mv "$APP.old" "$APP" 2>/dev/null || true; fi; rm -rf "$(dirname "$STAGE")"; "$APP/electron" --no-sandbox "$APP/resources/app.asar" >/dev/null 2>&1 &';
+      spawn('/bin/sh', ['-c', sh, 'slick-updater', appDir, stage, String(process.pid)], {
         detached: true,
         stdio: 'ignore',
       }).unref();

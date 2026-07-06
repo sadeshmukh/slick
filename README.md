@@ -2,7 +2,7 @@
   <img src="./assets/icon.png" alt="Logo" width="300" />
   <br />Slick
 </h1>
-<h3 align="center">The coolest Slack client mod for MacOS</h3>
+<h3 align="center">The coolest Slack client mod for MacOS, Windows, and Linux</h3>
 <div align="center">
   <img alt="GitHub Release" src="https://img.shields.io/github/v/release/3kh0/slick?logo=github&label=Latest%20Build">
   <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/3kh0/slick/total?label=Downloads&logo=github">
@@ -16,7 +16,7 @@
 
 Slick runs Slack's own `app.asar` with a custom Electron (with the handy BYOE acronym, bring your own electron) preload that injects themes and plugins. This method allows us to modify Slack's interface and behavior without altering its files, so auto-updates still work and there's no open debug port or resident watcher.
 
-This client targets MacOS, with a Windows beta (see below). The same method could also work on Linux with some adjustments. PRs welcome!
+This client targets MacOS, with Windows and Linux beta support (see below).
 
 ## Installation
 
@@ -85,6 +85,28 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
 You also have some nice flags to play around with locally: `-Uninstall`, `-Purge`, `-RestoreHandler`, and `-Force` to overwrite any existing install.
+
+## Linux (beta)
+
+> [!NOTE]
+> Linux support is new and x86_64-only. Slack doesn't ship an official arm64 Linux build, so there's nothing for an arm64 machine to run Slick against.
+
+Install Slack from your distro first (deb, rpm, AUR, whatever your package manager offers), then clone the repo and run:
+
+```bash
+./install-linux.sh
+```
+
+This builds `byoe/slick-linux`, installs a desktop entry, registers `slack://`, and launches Slick. For manual launch or debugging:
+
+```bash
+./scripts/launch-linux.sh
+./scripts/launch-linux.sh --debug 9223
+```
+
+You also have some nice flags to play around with: `--restore-handler` on `install-linux.sh` to give `slack://` back to the official Slack app, and `./scripts/uninstall-linux.sh` to remove Slick entirely.
+
+Prebuilt `x86_64` tarballs are published on the [releases page](https://github.com/3kh0/slick/releases/latest) too. Extract one and run `Slick/electron` directly; desktop integration is only wired up by the source build (`install-linux.sh`) for now.
 
 ## Release versioning
 
