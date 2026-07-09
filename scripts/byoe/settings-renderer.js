@@ -6,6 +6,7 @@
 
   const S = window.__slickSettings || { controlUrl: 'https://slick.control/', plugins: [], themes: [], theme: '' };
   const TAB_ID = 'slick';
+  const CUSTOM_THEME_ID = '__custom__';
   const SEL = {
     overlay: '.p-prefs_dialog',
     modal: '.p-prefs_dialog__modal',
@@ -32,7 +33,7 @@
       '#slick-panel-overlay{position:fixed;z-index:1200;overflow-y:auto;box-sizing:border-box;padding:20px 28px}',
       '#slick-panel-overlay .slick-intro{margin:0 0 18px;opacity:.62;line-height:1.45}',
       '#slick-panel-overlay .slick-legend{margin:0 0 12px}',
-      '#slick-panel-overlay .slick-plugin{padding:14px 0;border-top:1px solid rgba(127,127,127,.16)}',
+      '#slick-panel-overlay .slick-plugin{padding:14px 0;border-top:1px solid rgba(127,127,127,.16);position:relative}',
       '#slick-panel-overlay .slick-plugin:last-of-type{border-bottom:1px solid rgba(127,127,127,.16)}',
       '#slick-panel-overlay .slick-plugin .c-label{margin:0}',
       '#slick-applybar{position:sticky;bottom:-20px;margin:20px -28px -20px;padding:14px 28px;display:flex;align-items:center;gap:14px;background:rgba(127,127,127,.10);border-top:1px solid rgba(127,127,127,.2);backdrop-filter:blur(8px)}',
@@ -58,6 +59,11 @@
       '#slick-config-modal .slick-cfg-file .slick-cfg-file-button{flex:none}',
       '#slick-config-modal .slick-config-note{margin:14px 0 0;opacity:.55;font-size:12px}',
       '#slick-config-modal .slick-restart-required{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:999px;background:rgba(224,30,90,.14);color:#e01e5a;font-size:11px;font-weight:600}',
+      '#slick-panel-overlay .slick-customcss-edit{position:absolute;top:50%;right:0;transform:translateY(-50%)}',
+      '#slick-panel-overlay .slick-editor-back{opacity:.7;padding:4px 0;font-size:13px}',
+      '#slick-panel-overlay .slick-editor-back:hover{opacity:1}',
+      '#slick-panel-overlay .slick-customcss-editor{width:100%;min-height:320px;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;padding:10px 12px;border-radius:8px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.06);color:inherit;resize:vertical;tab-size:2}',
+      '#slick-panel-overlay .slick-customcss-editor:focus{outline:2px solid rgba(29,155,209,.5);outline-offset:1px}',
     ].join('\n');
     document.head.appendChild(st);
   }
@@ -68,7 +74,7 @@
       (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
     );
 
-  function row(text, sub, control, attrs = '') {
+  function row(text, sub, control, attrs = '', extra = '') {
     sub = sub ? '<span class="c-label__subtext" data-qa-label-subtext="true">' + esc(sub) + '</span>' : '';
     return (
       '<div class="slick-plugin"' +
@@ -84,7 +90,9 @@
       '<span class="c-label__children" data-qa-label-children="true">' +
       control +
       '</span>' +
-      '</label></div>'
+      '</label>' +
+      extra +
+      '</div>'
     );
   }
 
@@ -243,16 +251,20 @@
     });
   }
 
-  const themeRow = (t) =>
-    row(
-      esc(t.label),
-      t.description,
-      '<input class="c-input_radio" type="radio" name="slick-theme" value="' +
-        esc(t.file) +
-        '"' +
-        (t.active ? ' checked' : '') +
-        '>',
-    );
+  const themeRadio = (t) =>
+    '<input class="c-input_radio" type="radio" name="slick-theme" value="' +
+    esc(t.file) +
+    '"' +
+    (t.active ? ' checked' : '') +
+    '>';
+
+  const themeRow = (t) => {
+    const extra =
+      t.file === CUSTOM_THEME_ID
+        ? '<button class="c-button c-button--outline c-button--small slick-customcss-edit" type="button" data-open-customcss>Edit Custom CSS</button>'
+        : '';
+    return row(esc(t.label), t.description, themeRadio(t), '', extra);
+  };
 
   const rows = (items, render, dir) =>
     items.length
@@ -266,6 +278,7 @@
     ov.id = 'slick-panel-overlay';
     ov.style.display = 'none';
     ov.innerHTML =
+      '<div id="slick-view-list">' +
       '<p class="slick-intro">Configure your Slick settings here.</p>' +
       '<div class="c-legend slick-legend">Theme</div>' +
       '<div id="slick-theme-list">' +
@@ -278,8 +291,51 @@
       '<div id="slick-applybar" class="hidden">' +
       '<span class="slick-msg">These changes take effect after restarting Slick.</span>' +
       '<button id="slick-restart" class="c-button c-button--primary c-button--medium" type="button">Apply &amp; Restart</button>' +
+      '</div>' +
+      '</div>' +
+      '<div id="slick-view-editor" style="display:none">' +
+      '<button class="c-button-unstyled slick-editor-back" type="button" data-editor-back>&larr; Back</button>' +
+      '<div class="c-legend slick-legend" style="margin-top:14px">Custom CSS</div>' +
+      '<p class="slick-intro">Edits apply live, no restart needed. Select &ldquo;Custom CSS&rdquo; in the theme list to activate it.</p>' +
+      '<textarea id="slick-customcss" class="slick-customcss-editor" spellcheck="false" placeholder="/* your css here */"></textarea>' +
       '</div>';
     document.body.appendChild(ov);
+
+    function showView(name) {
+      const list = ov.querySelector('#slick-view-list');
+      const editor = ov.querySelector('#slick-view-editor');
+      if (list) list.style.display = name === 'editor' ? 'none' : 'block';
+      if (editor) editor.style.display = name === 'editor' ? 'block' : 'none';
+      if (name === 'editor') {
+        const ta = ov.querySelector('#slick-customcss');
+        if (ta) ta.focus();
+      }
+    }
+    ov.__slickShowView = showView;
+
+    const editBtn = ov.querySelector('[data-open-customcss]');
+    if (editBtn)
+      editBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showView('editor');
+      });
+    const backBtn = ov.querySelector('[data-editor-back]');
+    if (backBtn) backBtn.addEventListener('click', () => showView('list'));
+
+    const cssArea = ov.querySelector('#slick-customcss');
+    if (cssArea) {
+      cssArea.value = S.customCss || '';
+      let cssDebounce;
+      cssArea.addEventListener('input', () => {
+        clearTimeout(cssDebounce);
+        const value = cssArea.value;
+        cssDebounce = setTimeout(() => {
+          ctl({ op: 'customcss', value });
+          S.customCss = value;
+        }, 400);
+      });
+    }
 
     ov.querySelectorAll('input[name="slick-theme"]').forEach((input) => {
       input.addEventListener('change', (e) => {
@@ -391,7 +447,10 @@
     } else {
       closeConfig();
       const ov = $('slick-panel-overlay');
-      if (ov) ov.style.display = 'none';
+      if (ov) {
+        ov.style.display = 'none';
+        if (ov.__slickShowView) ov.__slickShowView('list');
+      }
       const tab = $(TAB_ID);
       if (tab) tab.classList.remove('c-tabs__tab--active');
     }
