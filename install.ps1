@@ -19,7 +19,7 @@ function Die($m)  { Write-Host "error: " -ForegroundColor Red -NoNewline; Write-
 
 function Assert-ReleaseAttestation([string]$Path) {
   if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    Write-Host "    (gh CLI not found; skipping provenance check — https://cli.github.com)" -ForegroundColor DarkGray
+    Write-Host "    (gh CLI not found; skipping provenance check - https://cli.github.com)" -ForegroundColor DarkGray
     return
   }
   Step "Verifying build provenance"
