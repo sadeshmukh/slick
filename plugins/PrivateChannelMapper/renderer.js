@@ -5,7 +5,6 @@
   if (window.__slickPCM) return;
   window.__slickPCM = true;
 
-  const KEY = 'slick:pcm:names';
   const SEL = '.c-missing_channel--private';
   const ID_RE = /^[CGD][A-Z0-9]{6,}$/;
 
@@ -79,7 +78,7 @@
     if (cachedFlaron && cachedFlaron[id]) return;
     if (pendingFlaron.has(id)) return;
     pendingFlaron.add(id);
-    const data = fetch('https://flaron.halceon.dev/channel/' + id)
+    fetch('https://flaron.halceon.dev/channel/' + id)
       .then((r) => r.json())
       .then((data) => {
         if (cachedFlaronUnavailable && cachedFlaronUnavailable.includes(id)) return;
