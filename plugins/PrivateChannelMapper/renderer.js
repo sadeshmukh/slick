@@ -10,10 +10,16 @@
 
   let names = read('slick:pcm:names');
 
-  const isFlaronEnabled = window.__slickPluginSettings?.PrivateChannelMapper?.flaron;
+  const FLARON_KEY = 'slick:pcm:flaron';
+  const FLARON_UNKNOWN_KEY = 'slick:pcm:flaron-unknown';
 
-  let cachedFlaron = read('slick:pcm:flaron');
-  let cachedFlaronUnavailable = JSON.parse(localStorage.getItem('slick:pcm:flaronunknown') || '[]');
+  function flaronEnabled() {
+    return !!window.__slickPluginSettings?.PrivateChannelMapper?.flaron;
+  }
+
+  const cachedFlaron = read(FLARON_KEY);
+  const flaronUnknown = read(FLARON_UNKNOWN_KEY);
+  const failedFlaron = new Set();
   const pendingFlaron = new Set();
 
   function read(key) {
@@ -74,49 +80,55 @@
     return n;
   }
 
+  function flaronUnknownRecently(id) {
+    const ts = flaronUnknown[id];
+    if (typeof ts !== 'number') return false;
+    if (Date.now() - ts < 24 * 60 * 60 * 1000) return true;
+    delete flaronUnknown[id];
+    return false;
+  }
+
   function getFlaron(id) {
-    if (cachedFlaron && cachedFlaron[id]) return;
-    if (pendingFlaron.has(id)) return;
+    if (cachedFlaron[id] || pendingFlaron.has(id) || failedFlaron.has(id)) return;
+    if (flaronUnknownRecently(id)) return;
     pendingFlaron.add(id);
     fetch('https://flaron.halceon.dev/channel/' + id)
       .then((r) => r.json())
       .then((data) => {
-        if (cachedFlaronUnavailable && cachedFlaronUnavailable.includes(id)) return;
-        if (data && data.name) {
-          cachedFlaron = cachedFlaron || {};
-          cachedFlaron[id] = data.name;
-          write('slick:pcm:flaron', cachedFlaron);
+        const name = data && typeof data.name === 'string' ? data.name.trim().slice(0, 100) : '';
+        if (name) {
+          cachedFlaron[id] = name;
+          write(FLARON_KEY, cachedFlaron);
           applyAll();
+        } else if (data && data.error === 'unknown') {
+          flaronUnknown[id] = Date.now();
+          write(FLARON_UNKNOWN_KEY, flaronUnknown);
         } else {
-          if (data && data.error && data.error == 'unknown') {
-            cachedFlaronUnavailable = cachedFlaronUnavailable || [];
-            cachedFlaronUnavailable.push(id);
-            write('slick:pcm:flaron-unknown', cachedFlaronUnavailable);
-            applyAll();
-          }
+          failedFlaron.add(id);
         }
-        pendingFlaron.delete(id);
       })
-      .catch(() => {});
+      .catch(() => {
+        failedFlaron.add(id);
+      })
+      .finally(() => pendingFlaron.delete(id));
   }
 
   function apply(el) {
     const id = idOf(el);
     if (!id) return;
     const custom = names[id];
-    el.title = custom ? id : '';
+    let flaron;
+    if (!custom && flaronEnabled()) {
+      getFlaron(id);
+      flaron = cachedFlaron[id];
+    }
+    const want = custom || flaron || id;
+    el.title = want === id ? '' : id;
 
     const node = labelTextNode(el);
-    let want;
-    if (isFlaronEnabled) {
-      getFlaron(id);
-      want = custom || cachedFlaron[id] || id;
-    } else {
-      want = custom || id;
-    }
-
     if (node.nodeValue !== want) node.nodeValue = want;
     el.classList.toggle('slick-pcm--named', !!custom);
+    el.classList.toggle('slick-pcm--flaron', !!flaron);
   }
 
   function applyAll() {
@@ -187,6 +199,7 @@
     }
     applyAll();
     obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+    window.addEventListener('slick:plugin-settings', applyAll);
   }
   boot();
 })();
