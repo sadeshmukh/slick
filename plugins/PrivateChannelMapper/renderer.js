@@ -9,11 +9,18 @@
   const SEL = '.c-missing_channel--private';
   const ID_RE = /^[CGD][A-Z0-9]{6,}$/;
 
-  let names = read();
-  function read() {
+  let names = read("slick:pcm:names");
+
+  const isFlaronEnabled = window.__slickPluginSettings?.PrivateChannelMapper?.flaron;
+
+  let cachedFlaron = read("slick:pcm:flaron");
+  let cachedFlaronUnavailable = JSON.parse(localStorage.getItem("slick:pcm:flaronunknown") || "[]")
+  const pendingFlaron = new Set();
+
+  function read(key) {
     let raw;
     try {
-      raw = JSON.parse(localStorage.getItem(KEY)) || {};
+      raw = JSON.parse(localStorage.getItem(key)) || {};
     } catch {
       return {};
     }
@@ -21,10 +28,10 @@
     for (const k of Object.keys(raw)) if (ID_RE.test(k)) clean[k] = raw[k];
     return clean;
   }
-  function write() {
+  function write(key, val) {
     try {
-      localStorage.setItem(KEY, JSON.stringify(names));
-    } catch {}
+      localStorage.setItem(key, JSON.stringify(val));
+    } catch { }
   }
 
   function fiberOf(el) {
@@ -68,13 +75,47 @@
     return n;
   }
 
+  function getFlaron(id) {
+    if (cachedFlaron && cachedFlaron[id]) return;
+    if (pendingFlaron.has(id)) return;
+    pendingFlaron.add(id);
+    const data = fetch("https://flaron.halceon.dev/channel/" + id)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cachedFlaronUnavailable && cachedFlaronUnavailable.includes(id)) return;
+        if (data && data.name) {
+          cachedFlaron = cachedFlaron || {};
+          cachedFlaron[id] = data.name;
+          write("slick:pcm:flaron", cachedFlaron);
+          applyAll();
+        } else {
+          if (data && data.error && data.error == "unknown") {
+            cachedFlaronUnavailable = cachedFlaronUnavailable || [];
+            cachedFlaronUnavailable.push(id);
+            write("slick:pcm:flaron-unknown", cachedFlaronUnavailable);
+            applyAll();
+          }
+        }
+        pendingFlaron.delete(id);
+      })
+      .catch(() => { });
+  }
+
   function apply(el) {
     const id = idOf(el);
     if (!id) return;
     const custom = names[id];
     el.title = custom ? id : '';
+
     const node = labelTextNode(el);
-    const want = custom || id;
+    let want;
+    if (isFlaronEnabled) {
+      getFlaron(id);
+      want = custom || cachedFlaron[id] || id;
+    } else {
+      want = custom || id;
+    }
+
     if (node.nodeValue !== want) node.nodeValue = want;
     el.classList.toggle('slick-pcm--named', !!custom);
   }
@@ -102,9 +143,9 @@
     input.setAttribute(
       'style',
       `position:fixed;left:${Math.round(r.left)}px;top:${Math.round(r.top)}px;` +
-        `min-width:${Math.max(120, Math.round(r.width) + 24)}px;z-index:2147483647;` +
-        `font:inherit;padding:2px 6px;border-radius:6px;border:1px solid #3a3a3a;` +
-        `background:#000;color:#fff;outline:none`,
+      `min-width:${Math.max(120, Math.round(r.width) + 24)}px;z-index:2147483647;` +
+      `font:inherit;padding:2px 6px;border-radius:6px;border:1px solid #3a3a3a;` +
+      `background:#000;color:#fff;outline:none`,
     );
     document.body.appendChild(input);
     input.focus();
@@ -114,7 +155,7 @@
         const v = input.value.trim();
         if (v) names[id] = v;
         else delete names[id];
-        write();
+        write("slick:pcm:names", names);
         closeEditor();
         applyAll();
       } else if (e.key === 'Escape') {
