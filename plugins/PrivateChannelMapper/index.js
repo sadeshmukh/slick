@@ -15,7 +15,6 @@ module.exports = {
       label: 'Use external private channel DB (Flaron)',
       description: 'If enabled, the plugin will show known private channel names if no local name is found.',
       default: false,
-      restart,
     },
   },
 };
