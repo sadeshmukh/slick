@@ -12,7 +12,7 @@ module.exports = {
   settings: {
     flaron: {
       type: 'boolean',
-      name: 'Use external private channel DB (Flaron)',
+      label: 'Use external private channel DB (Flaron)',
       description: 'If enabled, the plugin will show known private channel names if no local name is found.',
       default: false,
     },
