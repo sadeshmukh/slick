@@ -18,5 +18,4 @@ module.exports = {
 
     }
   },
-  restartRequired: true
 };
