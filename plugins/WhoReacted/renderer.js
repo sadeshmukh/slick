@@ -20,13 +20,18 @@
     } catch {}
     return {};
   }
+  let saveTimer = null;
   function sc() {
-    try {
-      const keys = Object.keys(avatars);
-      if (keys.length > 5000) for (const k of keys.slice(0, keys.length - 5000)) delete avatars[k];
-      localStorage.setItem('slick:wr:avatars', JSON.stringify(avatars));
-      localStorage.setItem('slick:wr:ts', String(Date.now()));
-    } catch {}
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      try {
+        const keys = Object.keys(avatars);
+        if (keys.length > 5000) for (const k of keys.slice(0, keys.length - 5000)) delete avatars[k];
+        localStorage.setItem('slick:wr:avatars', JSON.stringify(avatars));
+        localStorage.setItem('slick:wr:ts', String(Date.now()));
+      } catch {}
+    }, 1000);
   }
 
   function fiberOf(el) {

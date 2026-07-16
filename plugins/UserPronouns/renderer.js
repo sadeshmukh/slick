@@ -9,6 +9,7 @@
   let dirty = false;
   const queued = new Set();
   const inflight = new Set();
+  const knownEmpty = new Set();
 
   function loadCache() {
     try {
@@ -41,6 +42,9 @@
     return k ? el[k] : null;
   }
   function userIdOf(el) {
+    const direct = el.closest('[data-message-sender]') || el.querySelector('[data-message-sender]');
+    const directId = direct && direct.getAttribute('data-message-sender');
+    if (directId && ID_RE.test(directId)) return directId;
     let f = fiberOf(el);
     let hops = 0;
     while (f && hops < 40) {
@@ -158,7 +162,7 @@
     }
   }
 
-  async function fetch(id) {
+  async function fetchPronouns(id) {
     let token = null;
     try {
       const cfg = JSON.parse(localStorage.getItem('localConfig_v2'));
@@ -171,7 +175,7 @@
     const body = new FormData();
     body.append('token', token);
     body.append('user', id);
-    const res = await fetch('/api/users.info', { method: 'POST', body });
+    const res = await window.fetch('/api/users.info', { method: 'POST', body });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
     if (!data || !data.ok) return data && data.error === 'user_not_found' ? '' : null;
@@ -186,13 +190,12 @@
     }
     Promise.all(
       ids.map(async (id) => {
-        const p = await fetch(id).catch(() => null);
+        const p = await fetchPronouns(id).catch(() => null);
         inflight.delete(id);
         if (p !== null) {
           cache[id] = p;
+          if (!p) knownEmpty.add(id);
           dirty = true;
-        } else {
-          cache[id] = '';
         }
       }),
     ).then(() => {
@@ -203,14 +206,15 @@
 
   function pronounsFor(id) {
     const fromStore = storePronouns(id);
-    if (fromStore !== null) {
+    if (fromStore) {
       if (cache[id] !== fromStore) {
         cache[id] = fromStore;
         dirty = true;
       }
       return fromStore;
     }
-    if (id in cache) return cache[id];
+    if (cache[id]) return cache[id];
+    if (knownEmpty.has(id)) return '';
     if (!inflight.has(id)) queued.add(id);
     return '';
   }
